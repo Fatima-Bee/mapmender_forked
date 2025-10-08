@@ -1,5 +1,5 @@
 # mapmender
-Mapmender. See the World as it Is — Not as it Was.
+Mapmender - See the World as it Is — Not as it Was.
 
 Navigating rural roads, less-traveled routes, and rapidly changing environments can be challenging, especially when available map data is out of date. It is difficult for navigation apps to stay current with so many changing real-world conditions. Our app addresses this by providing a community-driven mapping platform that helps users report, discover, and navigate road conditions accurately, while quickly updating map data for others.
 
