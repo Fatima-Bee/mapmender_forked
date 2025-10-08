@@ -1,10 +1,158 @@
 <!DOCTYPE html>
- <html>
+<html lang="en"></html> 
+<html>
   <head>
-   <title>Mapmender</title>
+
+    <!-- meta for the browser to allow for mobiel first design -->
+    <meta charset="utf-8"/> <!--This ensures that the web page can display characters from various languages and character sets.-->
+    
+    <!--Sets the viewport properties for the web page. The viewport determines how the web page is displayed on different devices and screen sizes. 
+    The "initial-scale=1" property sets the initial zoom level of the page to 100%, while the "maximum-scale=1" and "user-scalable=no" properties 
+    prevent users from zooming in or out of the page using pinch or zoom gestures on their devices.-->
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no"/> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Mapmender - See the World as it Is — Not as it Was.</title>
+
+    <!-- To make the map fill the browser window -->
+    <style>
+        html,
+        body,
+        #viewDiv {
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        width: 100%;
+        }
+
+        /* Adding CSS for Survey button. */
+        .addRecordBtn {
+        position: absolute;
+        z-index: 10;
+        top: 60px;   /* push it down below the search widget */
+        right: 10px;
+        background-color: #feffff;
+        color: rgb(132, 132, 132);
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+        text-decoration: none;
+        }
+
+        .addRecordBtn:hover {
+        background-color: #005a87;
+        }
+
+        #uploadContainer {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 99;
+        background: white;
+        padding: 10px;
+        border-radius: 8px;
+        box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+
+    </style>
+
+
+    <!-- References the main.css style sheet, which contains styles specific to Esri widgets and components. -->
+    <!-- 'rel' means "relationship" between the current HTML document and the linked resource -->
+    <!-- 'href' means hyperlink reference -->
+    <link rel="stylesheet" href="https://js.arcgis.com/4.26/esri/themes/light/main.css"/>
+
+    <!-- Loading the ArcGIS Maps SDK for JavaScript from a CDN. When new versions of the API are released, update the version number to match the newly released version. -->
+    <script src="https://js.arcgis.com/4.29/"></script>
+
+    
   </head>
   <body>
    <!-- hello world text to check if everything worked -->
-   <h1>Hello World! I am ready to collect data.</h1>
+   <!-- <h1>Hello World! I am ready to collect data.</h1> -->
+
+    <!-- DOM element to hold the upload feature. -->
+    <div id="uploadContainer">
+        <h4>Upload Route (.GPX)</h4>
+        <input type="file" id="gpxInput" accept=".gpx" />
+        <br><br>
+        <label>Buffer (meters): <input type="number" id="bufferInput" value="10" /></label>
+    </div>
+
+    <!-- DOM element to hold the main map.  -->
+    <!-- <div> (short for division) is a generic HTML block element. It doesn’t show anything by itself — it’s just a rectangle you can style. -->
+    <div id="viewDiv"></div>
+
+    <script> 
+        window.onload = () => {  // delay running the script until the DOM is ready, else I see: '#container element with id 'viewDiv' not found'
+            // esri/Map - loads code specific to creating a map
+            // esri/views/MapView - loads code that allows for viewing the map in 2D
+            // 'require' loads JS modules asynchronously.  
+            // The function (Map, MapView) => { ... } runs after the modules are loaded, with each module passed in as an argument.
+            require([
+                "esri/config", 
+                "esri/Map", 
+                "esri/views/MapView", 
+                "esri/widgets/Locate", 
+                "esri/widgets/Search", 
+                "esri/layers/FeatureLayer"
+            ], (esriConfig, Map, MapView, Locate, Search, FeatureLayer) => { 
+                
+                // Log into the API with a private key
+                esriConfig.apiKey = "AAPTxy8BH1VEsoebNVZXo8HurC-WNby9xVB5CaUbYmSkdtsZmMyGnfH1JuHkPFwFFSBd3Z-v-N7m_s6f1dmRgKVLamcFHqSo0cttTR09tKsFzmbXZUhJIfKzl2R6HLQtKWGyGlzHobrqUHrwEOtLR9miyCr3AH4LGIs4bD8J_IfjNZJFYZiID06JxdIjFa_CX5wLcu2d2_5Pr2huNg7-z1mKuSnOsU5nBktIt9t_XxG-4s-ytgy_1uafScxdrTypBn4BAT1_UUjVT5i4";
+
+                // This module creates a map object that defines the basemap and operational layers.
+                const map = new Map({
+                    basemap: "arcgis-navigation"
+                    // basemap: "satellite"
+                    // Try any of these: "arcgis-imagery", "arcgis-imagery-standard", "arcgis-imagery-labels", "arcgis-light-gray", "arcgis-dark-gray", "arcgis-navigation", "arcgis-navigation-night", "arcgis-streets", "arcgis-streets-night", "arcgis-streets-relief", "arcgis-topographic", "arcgis-oceans", "osm-standard", "osm-standard-relief", "osm-streets", "osm-streets-relief", "osm-light-gray", "osm-dark-gray", "arcgis-terrain", "arcgis-community", "arcgis-charted-territory", "arcgis-colored-pencil", "arcgis-nova", "arcgis-modern-antique", "arcgis-midcentury", "arcgis-newspaper", "arcgis-hillshade-light", "arcgis-hillshade-dark", "arcgis-human-geography", "arcgis-human-geography-dark"
+                })
+
+                // Creates a MapView instance → the 2D view that renders your Map object in the browser.
+                // Without this, i'd have a map defined in memory, but nothing would be drawn to the screen.
+                // “Take my Map object and render it inside the HTML element called viewDiv as a 2D map.”
+                const view = new MapView({
+                    container: "viewDiv",               // The HTML element id where the map will appear.  Tells the view where (which DOM node) in the HTML to put the map.  Looks for a <div> with id="viewDiv"
+                    map: map,                           // The map object (from earlier) to display inside the viewDiv.
+                    center: [-106.101844, 39.250573],   // Initial longitude, latitude.
+                    zoom: 13                            // Zoom level of the map.  0 > whole world, 23 street level.
+                })
+
+                // Adding a Locate button (widget)
+                const locateBtn = new Locate({
+                    // view (on the left) >  This is the property name of the Locate widget’s options.
+                    // view (on the right) >  This is the variable created earlier in the code.
+                    view: view                          // Tell the Locate widget which MapView it should control.
+                })
+
+                view.ui.add(locateBtn, {                // Add the locate widget to the view's built-in UI
+                    position: "top-left"                // Position the widget in the top-left corner of the map
+                });
+
+                // Adding an Address or Search bar, using Search Widget.
+                const searchWidget = new Search({
+                    // view: (on the left) >  This is the property name of the Locate widget’s options.
+                    // view (on the right) >  This is the variable created earlier in the code.
+                    view: view                          // Tell the Search widget which MapView it shoudl control. 
+                });
+
+                view.ui.add(searchWidget, {
+                    position: "top-right"
+                });
+
+                // // Creating the Survey FeatureLayer from the feature service.
+                // const layer = new FeatureLayer({
+                //     url: "https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/survey123_135cbb5fb05c4aeeb7e619aa6ff9b641_results/FeatureServer/0"
+                // });
+
+                // // Adding the Survey FeatureLayer to the map.
+                // map.add(layer);
+
+
+            });
+        };
+    </script>
   </body>
 </html>
