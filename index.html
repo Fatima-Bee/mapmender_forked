@@ -116,9 +116,31 @@
                 const view = new MapView({
                     container: "viewDiv",               // The HTML element id where the map will appear.  Tells the view where (which DOM node) in the HTML to put the map.  Looks for a <div> with id="viewDiv"
                     map: map,                           // The map object (from earlier) to display inside the viewDiv.
-                    center: [-106.101844, 39.250573],   // Initial longitude, latitude.
+                    center: [-89.4012, 43.0731],        // Madison, WI (fallback)
                     zoom: 13                            // Zoom level of the map.  0 > whole world, 23 street level.
                 })
+
+                // Try to center the map on the user's location
+                if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(               // Built-in browser API for location.
+                    (position) => {
+                    // Success — center the view on user's location
+                    const userLongitude = position.coords.longitude;
+                    const userLatitude = position.coords.latitude;
+
+                    view.center = [userLongitude, userLatitude];        // Recenter the map on the user's longitude and latitude, if possible.
+                    view.zoom = 13;
+
+                    console.log(`Centered on user location: ${userLongitude}, ${userLatitude}`);
+                    },
+                    (error) => {
+                    console.warn("Geolocation failed or denied. Using fallback (Madison, WI).", error);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }        // Uses GPS (if available) instead of IP-based location.
+                );
+                } else {
+                console.warn("Geolocation not supported. Using fallback (Madison, WI).");
+                }
 
                 // Adding a Locate button (widget)
                 const locateBtn = new Locate({
