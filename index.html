@@ -1,6 +1,12 @@
+<!-- To do: 
+- Add multiple select for Hazards Survey
+- Make the closure symbol a circle with slash
+- Make the hazard symbol a caution w/ exclamation
+- 
+-->
+
 <!DOCTYPE html>
-<html lang="en"></html> 
-<html>
+<html lang="en">
   <head>
 
     <!-- meta for the browser to allow for mobiel first design -->
@@ -9,7 +15,6 @@
     <!--Sets the viewport properties for the web page. The viewport determines how the web page is displayed on different devices and screen sizes. 
     The "initial-scale=1" property sets the initial zoom level of the page to 100%, while the "maximum-scale=1" and "user-scalable=no" properties 
     prevent users from zooming in or out of the page using pinch or zoom gestures on their devices.-->
-    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no"/> 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <title>Mapmender - See the World as it Is — Not as it Was.</title>
@@ -39,6 +44,7 @@
         font-size: 14px;
         cursor: pointer;
         text-decoration: none;
+        box-shadow: 0 0 5px rgba(0,0,0,0.3);
         }
 
         .addRecordBtn:hover {
@@ -47,8 +53,8 @@
 
         #uploadContainer {
         position: absolute;
-        top: 10px;
-        left: 10px;
+        bottom: 20px;   /* position from bottom */
+        left: 20px;     /* position from left */
         z-index: 99;
         background: white;
         padding: 10px;
@@ -62,7 +68,7 @@
     <!-- References the main.css style sheet, which contains styles specific to Esri widgets and components. -->
     <!-- 'rel' means "relationship" between the current HTML document and the linked resource -->
     <!-- 'href' means hyperlink reference -->
-    <link rel="stylesheet" href="https://js.arcgis.com/4.26/esri/themes/light/main.css"/>
+    <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css"/>
 
     <!-- Loading the ArcGIS Maps SDK for JavaScript from a CDN. When new versions of the API are released, update the version number to match the newly released version. -->
     <script src="https://js.arcgis.com/4.29/"></script>
@@ -73,12 +79,15 @@
    <!-- hello world text to check if everything worked -->
    <!-- <h1>Hello World! I am ready to collect data.</h1> -->
 
+    <!-- Adding the Survey button. -->
+    <a href="https://survey123.arcgis.com/share/679dbea6861f447ca59cdfcb53ae88b5" target="_blank" class="addRecordBtn">Add Record</a>
+
     <!-- DOM element to hold the upload feature. -->
     <div id="uploadContainer">
         <h4>Upload Route (.GPX)</h4>
         <input type="file" id="gpxInput" accept=".gpx" />
         <br><br>
-        <label>Buffer (meters): <input type="number" id="bufferInput" value="10" /></label>
+        <label>Buffer (meters): <input type="number" id="bufferInput" value="50" /></label>
     </div>
 
     <!-- DOM element to hold the main map.  -->
@@ -97,8 +106,10 @@
                 "esri/views/MapView", 
                 "esri/widgets/Locate", 
                 "esri/widgets/Search", 
-                "esri/layers/FeatureLayer"
-            ], (esriConfig, Map, MapView, Locate, Search, FeatureLayer) => { 
+                "esri/layers/FeatureLayer",
+                "esri/geometry/geometryEngine",
+                "esri/Graphic"
+            ], (esriConfig, Map, MapView, Locate, Search, FeatureLayer, geometryEngine, Graphic) => { 
                 
                 // Log into the API with a private key
                 esriConfig.apiKey = "AAPTxy8BH1VEsoebNVZXo8HurC-WNby9xVB5CaUbYmSkdtsZmMyGnfH1JuHkPFwFFSBd3Z-v-N7m_s6f1dmRgKVLamcFHqSo0cttTR09tKsFzmbXZUhJIfKzl2R6HLQtKWGyGlzHobrqUHrwEOtLR9miyCr3AH4LGIs4bD8J_IfjNZJFYZiID06JxdIjFa_CX5wLcu2d2_5Pr2huNg7-z1mKuSnOsU5nBktIt9t_XxG-4s-ytgy_1uafScxdrTypBn4BAT1_UUjVT5i4";
@@ -124,22 +135,23 @@
                 if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(               // Built-in browser API for location.
                     (position) => {
-                    // Success — center the view on user's location
-                    const userLongitude = position.coords.longitude;
-                    const userLatitude = position.coords.latitude;
+                        // Success — center the view on user's location
+                        const userLongitude = position.coords.longitude;
+                        const userLatitude = position.coords.latitude;
 
-                    view.center = [userLongitude, userLatitude];        // Recenter the map on the user's longitude and latitude, if possible.
-                    view.zoom = 13;
+                        view.center = [userLongitude, userLatitude];        // Recenter the map on the user's longitude and latitude, if possible.
+                        view.zoom = 13;
 
-                    console.log(`Centered on user location: ${userLongitude}, ${userLatitude}`);
+                        console.log(`Centered on user location: ${userLongitude}, ${userLatitude}`);
                     },
                     (error) => {
-                    console.warn("Geolocation failed or denied. Using fallback (Madison, WI).", error);
+                        console.warn("Geolocation failed or denied. Using fallback (Madison, WI).", error);
                     },
                     { enableHighAccuracy: true, timeout: 10000 }        // Uses GPS (if available) instead of IP-based location.
                 );
+
                 } else {
-                console.warn("Geolocation not supported. Using fallback (Madison, WI).");
+                    console.warn("Geolocation not supported. Using fallback (Madison, WI).");
                 }
 
                 // Adding a Locate button (widget)
@@ -164,14 +176,141 @@
                     position: "top-right"
                 });
 
-                // // Creating the Survey FeatureLayer from the feature service.
-                // const layer = new FeatureLayer({
-                //     url: "https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/survey123_135cbb5fb05c4aeeb7e619aa6ff9b641_results/FeatureServer/0"
-                // });
+                // Creating the Survey FeatureLayer from the feature service.
+                const layer = new FeatureLayer({
+                    // url: "https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Closure_Layer/FeatureServer/0"
+                    url: "https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Closure_Layer_Public/FeatureServer/0",
+                    outFields: ["*"], // make all fields available to the popup
+                    popupTemplate: {
+                        title: "Road Closure",
+                        content: `
+                        <b>Status:</b> {access_status}<br>
+                        <b>Impassability:</b> {impasse_reasons}<br>
+                        <b>Hazards:</b> {hazards}<br>
+                        <b>Latitude:</b> {esrignss_latitude}<br>
+                        <b>Longitude:</b> {esrignss_longitude}<br>
+                        <b>Reported by:</b> {Creator}<br>
+                        <b>Last Updated:</b> {EditDate}<br>
+                        <b>Notes:</b> {notes}
+                        `
+                    }
+                });
 
-                // // Adding the Survey FeatureLayer to the map.
-                // map.add(layer);
+                // Adding the Survey FeatureLayer to the map.
+                map.add(layer);
 
+                // GPX handling section
+                document.getElementById("gpxInput").addEventListener("change", handleGPXUpload);
+
+                function handleGPXUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const bufferDistance = Number(document.getElementById("bufferInput").value) || 50;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const parser = new DOMParser();
+                    const xml = parser.parseFromString(e.target.result, "application/xml");
+                    const trkpts = xml.getElementsByTagName("trkpt");
+
+                    if (!trkpts.length) {
+                    alert("No GPS track points found in the GPX file.");
+                    return;
+                    }
+
+                    const path = [];
+                    for (let i = 0; i < trkpts.length; i++) {
+                    const lat = parseFloat(trkpts[i].getAttribute("lat"));
+                    const lon = parseFloat(trkpts[i].getAttribute("lon"));
+                    path.push([lon, lat]);
+                    }
+
+                    const polyline = {
+                    type: "polyline",
+                    paths: [path],
+                    spatialReference: { wkid: 4326 }
+                    };
+
+                    // ✅ Project polyline to Web Mercator before buffering
+                    require([
+                    "esri/geometry/projection",
+                    "esri/geometry/support/webMercatorUtils"
+                    ], (projection, webMercatorUtils) => {
+
+                    projection.load().then(() => {
+
+                        // Get SRs
+                        const gpxSR = { wkid: 4326 };                  // GPX native
+                        const layerSR = layer.spatialReference;        // e.g. 4326 or 3857
+
+                        // Project GPX polyline into the layer's SR (ensures perfect alignment)
+                        let polylineProjected = projection.project(polyline, layerSR);
+
+                        // Center map on uploaded route
+                        view.goTo({ target: polylineProjected, zoom: 10 }).catch(err => console.warn(err));
+
+                        // Add GPX track to the map for visualization
+                        const gpxLineGraphic = new Graphic({
+                        geometry: polylineProjected,
+                        symbol: {
+                            type: "simple-line",
+                            color: [0, 120, 255, 0.8], // bright blue line
+                            width: 2
+                        }
+                        });
+
+                        // Optional: clear old GPX tracks before adding new
+                        view.graphics.removeAll();
+                        view.graphics.add(gpxLineGraphic);
+
+                        // If projection service unavailable, fall back to WebMercatorUtils
+                        if (!polylineProjected) {
+                        polylineProjected = webMercatorUtils.geographicToWebMercator(polyline);
+                        }
+
+                        // Buffer in meters only if layerSR is linear
+                        let bufferGeom;
+                        if (layerSR.isGeographic) {
+                        // project to a linear SR for buffering
+                        const tempLinear = { wkid: 3857 };
+                        const tempProj = projection.project(polyline, tempLinear);
+                        const buffered = geometryEngine.buffer(tempProj, bufferDistance, "meters");
+                        // reproject back to layer's SR
+                        bufferGeom = projection.project(buffered, layerSR);
+                        } else {
+                        bufferGeom = geometryEngine.buffer(polylineProjected, bufferDistance, "meters");
+                        }
+
+                        // Convert buffer back to WGS84 for querying (layer likely in 4326)
+                        const bufferWGS84 = projection.project(bufferGeom, { wkid: 4326 });
+
+                        const query = layer.createQuery();
+                        query.geometry = bufferWGS84;
+                        query.spatialRelationship = "intersects";
+                        query.returnGeometry = true;
+                        query.outFields = ["access_status", "impasse_reasons"];
+
+                        layer.queryFeatures(query).then((results) => {
+                        if (results.features.length > 0) {
+                            alert(`⚠️ WARNING: ${results.features.length} closures found within ${bufferDistance}m of your route.`);
+                            results.features.forEach(f => {
+                            f.symbol = {
+                                type: "simple-marker",
+                                color: "red",
+                                size: "10px"
+                            };
+                            });
+                            view.graphics.addMany(results.features);
+                        } else {
+                            alert("✅ No closures found near your uploaded route.");
+                        }
+                        }).catch(err => console.error("Query failed", err));
+                    });
+                    });
+                };
+                reader.readAsText(file);
+                }
 
             });
         };
