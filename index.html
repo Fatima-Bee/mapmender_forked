@@ -2,7 +2,7 @@
 - Add multiple select for Hazards Survey
 - Make the closure symbol a circle with slash
 - Make the hazard symbol a caution w/ exclamation
-- 
+- Improved reopening logic.  Concern that once marked as closed, users may route away indefinitely.  Need an automated way detect reopening.
 -->
 
 <!DOCTYPE html>
@@ -72,19 +72,20 @@
 
     <!-- Loading the ArcGIS Maps SDK for JavaScript from a CDN. When new versions of the API are released, update the version number to match the newly released version. -->
     <script src="https://js.arcgis.com/4.29/"></script>
-
     
   </head>
+
   <body>
    <!-- hello world text to check if everything worked -->
    <!-- <h1>Hello World! I am ready to collect data.</h1> -->
 
+   
     <!-- Adding the Survey button. -->
     <a href="https://survey123.arcgis.com/share/679dbea6861f447ca59cdfcb53ae88b5" target="_blank" class="addRecordBtn">Add Record</a>
 
     <!-- DOM element to hold the upload feature. -->
     <div id="uploadContainer">
-        <h4>Upload Route (.GPX)</h4>
+        <h4>Check a Route for Closures(.GPX)</h4>
         <input type="file" id="gpxInput" accept=".gpx" />
         <br><br>
         <label>Buffer (meters): <input type="number" id="bufferInput" value="50" /></label>
@@ -247,6 +248,12 @@
                         // Project GPX polyline into the layer's SR (ensures perfect alignment)
                         let polylineProjected = projection.project(polyline, layerSR);
 
+                        console.log("Original GPX polyline:", polyline);
+                        // console.log("Projected polyline:", polylineProjected);
+                        console.log("Projected polyline SR:", polylineProjected.spatialReference);
+                        // console.log("FeatureLayer spatial reference:", layer.spatialReference);
+                        console.log("FeatureLayer WKID:", layer.spatialReference.wkid);
+
                         // Center map on uploaded route
                         view.goTo({ target: polylineProjected, zoom: 10 }).catch(err => console.warn(err));
 
@@ -255,7 +262,9 @@
                         geometry: polylineProjected,
                         symbol: {
                             type: "simple-line",
-                            color: [0, 120, 255, 0.8], // bright blue line
+                            // color: [0, 120, 255, 0.8], // bright blue line
+                            // color: [128, 0, 128, 0.8],
+                            color: [255, 0, 255, 0.8],
                             width: 2
                         }
                         });
@@ -267,6 +276,7 @@
                         // If projection service unavailable, fall back to WebMercatorUtils
                         if (!polylineProjected) {
                         polylineProjected = webMercatorUtils.geographicToWebMercator(polyline);
+                        console.log("Fallback projected polyline (Web Mercator):", polylineProjected);
                         }
 
                         // Buffer in meters only if layerSR is linear
@@ -281,6 +291,23 @@
                         } else {
                         bufferGeom = geometryEngine.buffer(polylineProjected, bufferDistance, "meters");
                         }
+
+                        // <<< ADD THIS BLOCK TO SHOW THE BUFFER ON THE MAP >>>
+                        require(["esri/Graphic"], (Graphic) => {
+                        const bufferGraphic = new Graphic({
+                            geometry: bufferGeom,
+                            symbol: {
+                            type: "simple-fill",
+                            color: [200, 160, 255, 0.1], // light blue, semi-transparent
+                            outline: {
+                                // color: [0, 0, 255, 0.8],
+                                color: [128, 0, 128, 0.2], // bright blue line
+                                width: 0.5
+                            }
+                            }
+                        });
+                        view.graphics.add(bufferGraphic);
+                        });
 
                         // Convert buffer back to WGS84 for querying (layer likely in 4326)
                         const bufferWGS84 = projection.project(bufferGeom, { wkid: 4326 });
