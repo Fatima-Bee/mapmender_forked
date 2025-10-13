@@ -21,71 +21,157 @@
 
     <!-- To make the map fill the browser window -->
     <style>
+        /* Full height map and reset margins */
         html,
         body,
         #viewDiv {
-        padding: 0;
-        margin: 0;
-        height: 100%;
-        width: 100%;
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            font-family: Arial, sans-serif;
         }
 
-        #sidebar {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        z-index: 99;
-        background: rgba(255, 255, 255, 0.95);
-        border-radius: 10px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-        width: 260px;
-        transition: transform 0.3s ease;
-        overflow: hidden;
+        /* Left panel styling */
+        #leftPanel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 250px;           /* expanded width */
+            background: #892be2d0;  /* purple with slight transparency */
+            color: white;            /* default text color */
+            box-shadow: 2px 0 5px rgba(0,0,0,0.3);
+            z-index: 100;
+            overflow: hidden;
+            transition: width 0.3s;
         }
 
-        #sidebar.collapsed {
-        transform: translateX(-230px);
+        #leftPanel.collapsed {
+            width: 40px;             /* collapsed width, just shows toggle button */
         }
 
-        #toggleSidebar {
-        width: 100%;
-        border: none;
-        background: #5a0fa3;
-        color: white;
-        font-size: 16px;
-        padding: 10px;
-        cursor: pointer;
-        border-top-left-radius: 10px;
-        border-top-right-radius: 10px;
+        /* Toggle button */
+        #togglePanelBtn {
+            display: block;
+            margin: 10px;
+            font-size: 20px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            color: white;
         }
 
-        #toggleSidebar:hover {
-        background: #7c1ad1;
+        /* Panel content */
+        #panelContent {
+            padding: 10px;
+            max-height: calc(100% - 50px);
+            overflow-y: auto;        /* scroll only if content exceeds panel height */
         }
 
-        #sidebarContent {
-        padding: 12px;
+        /* Hide content when collapsed */
+        #leftPanel.collapsed #panelContent {
+            display: none;
         }
 
-        .tool-section {
-        margin-top: 10px;
-        border-top: 1px solid #ccc;
-        padding-top: 10px;
+        /* Header in the panel */
+        #panelContent h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            font-weight: normal;     /* lighter text */
+            display: flex;
+            align-items: center;
         }
 
-        .addRecordBtn {
-        display: inline-block;
-        background: #590fa386;
-        color: white;
-        text-decoration: none;
-        padding: 8px 12px;
-        border-radius: 6px;
+        /* Add green checkmark next to header text */
+        #panelContent h4 span {
+            margin-right: 6px;
         }
 
-        .addRecordBtn:hover {
-        background: #7c1ad181;
+        /* GPX uploader container inside the panel */
+        #uploadContainer {
+            background: #9b30ff;     /* lighter purple */
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+            margin-bottom: 12px;
         }
 
+        /* Input fields inside panel */
+        #panelContent input[type="file"],
+        #panelContent input[type="number"] {
+            margin-top: 6px;
+            width: 100%;
+            padding: 6px 8px;
+            border-radius: 4px;
+            border: none;
+            outline: none;
+            font-family: inherit;
+            font-size: inherit;
+            color: black;             /* ensures buffer value is visible */
+            background-color: white;   /* matches button style */
+            box-sizing: border-box;
+        }
+
+        /* Label for buffer input */
+        #panelContent label {
+            display: block;
+            margin-top: 8px;
+            font-size: 13px;
+        }
+
+        /* “Report a Closure” button inside panel */
+        #addRecordBtn {
+            display: block;
+            width: 100%;
+            text-align: center;
+            background-color: white;   /* white fill */
+            color: #892be2;            /* purple text */
+            padding: 10px 0;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+            margin-bottom: 12px;       /* space before next section */
+        }
+
+        /* Hover effect for button */
+        #addRecordBtn:hover {
+            background-color: #f0f0f0;  /* subtle light gray hover */
+        }
+
+        /* Optional horizontal separator between button and GPX section */
+        #panelContent hr {
+            border: 0;
+            border-top: 1px solid rgba(255,255,255,0.3);
+            margin: 10px 0;
+        }
+
+        /* Ensure consistent font for all panel content */
+        #panelContent,
+        #panelContent h4,
+        #panelContent label,
+        #panelContent input,
+        #panelContent button {
+            font-family: Arial, sans-serif;
+        }
+
+        /* Optional: scroll bar styling */
+        #panelContent::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #panelContent::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.3);
+            border-radius: 3px;
+        }
+
+        #panelContent::-webkit-scrollbar-track {
+            background: transparent;
+        }
     </style>
 
 
@@ -104,15 +190,15 @@
    <!-- <h1>Hello World! I am ready to collect data.</h1> -->
 
     <!-- Collapsible Sidebar -->
-    <div id="sidebar">
+    <!-- <div id="sidebar">
     <button id="toggleSidebar">☰ Tools</button>
     <div id="sidebarContent">
 
-        <!-- <h3>Tools</h3> -->
+        <h3>Tools</h3> -->
 
-        <div class="tool-section">
+        <!-- <div class="tool-section"> -->
         <!-- <h4>➕ Add Record</h4> -->
-            <a href="https://survey123.arcgis.com/share/679dbea6861f447ca59cdfcb53ae88b5"
+            <!-- <a href="https://survey123.arcgis.com/share/679dbea6861f447ca59cdfcb53ae88b5"
             target="_blank"
             class="addRecordBtn"
             id="addRecordBtn">📍Report a Closure or Hazard</a>
@@ -128,7 +214,20 @@
         </div>
 
     </div>
-    </div>
+    </div> -->
+
+    <div id="leftPanel" class="collapsed">
+        <button id="togglePanelBtn">☰</button>
+        <div id="panelContent">
+            <button id="addRecordBtn">Report a Closure</button>
+            <!-- Divider -->
+            <hr style="border: 1px solid rgba(255,255,255,0.3); margin: 15px 0;" />
+            <h4>Check a Route for Closures (.GPX)</h4>
+            <input type="file" id="gpxInput" accept=".gpx" />
+            <br><br>
+            <label>Buffer (meters): <input type="number" id="bufferInput" value="50" /></label>
+        </div>
+        </div>
 
     <!-- DOM element to hold the main map.  -->
     <!-- <div> (short for division) is a generic HTML block element. It doesn’t show anything by itself — it’s just a rectangle you can style. -->
@@ -245,6 +344,25 @@
                 // GPX handling section
                 document.getElementById("gpxInput").addEventListener("change", handleGPXUpload);
                 document.getElementById("addRecordBtn").addEventListener("click", handleAddRecord);
+
+                const leftPanel = document.getElementById("leftPanel");
+                const toggleBtn = document.getElementById("togglePanelBtn");
+                const viewDiv = document.getElementById("viewDiv");
+
+                toggleBtn.addEventListener("click", () => {
+                leftPanel.classList.toggle("collapsed");
+
+                // Notify the ArcGIS MapView to resize when panel changes
+                if (window.view) { // assuming your MapView is stored in `view`
+                    window.view.padding = {
+                    left: leftPanel.classList.contains("collapsed") ? 40 : 250,
+                    top: 0,
+                    right: 0,
+                    bottom: 0
+                    };
+                    window.view.resize();
+                }
+                });
 
                 function handleAddRecord() {
                     // Opens your Survey123 form in a new tab
