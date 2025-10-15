@@ -285,7 +285,7 @@
                     // URL of the Feature Service and specific layer (0 = first layer in the service)
                     url: "https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Closure_Layer_Public/FeatureServer/0",
                     
-                    // outFields specifies which fields are available for popups, queries, and rendering.
+                    // OutFields specifies which fields are available for popups, queries, and rendering.
                     // Using ["*"] makes all fields in the service available.
                     outFields: ["*"],
 
@@ -310,171 +310,158 @@
                 map.add(layer);
 
                 // GPX handling section
+                // Add an event listener to the GPX file input element. When the user selects a GPX file, the handleGPXUpload function is called.
                 document.getElementById("gpxInput").addEventListener("change", handleGPXUpload);
+
+                // Add an event listener to the "Add Record" button.  When clicked, the handleAddRecord function is triggered.
                 document.getElementById("addRecordBtn").addEventListener("click", handleAddRecord);
 
-                const leftPanel = document.getElementById("leftPanel");
-                const toggleBtn = document.getElementById("togglePanelBtn");
-                const viewDiv = document.getElementById("viewDiv");
+                // Establish references to key HTML elements for panel management and map display, to be used later
+                const leftPanel = document.getElementById("leftPanel");       // The collapsible left panel
+                const toggleBtn = document.getElementById("togglePanelBtn"); // Button to collapse/expand the panel
+                const viewDiv = document.getElementById("viewDiv");          // Div containing the ArcGIS MapView
 
+                // Add click event to toggle button to collapse/expand the left panel
                 toggleBtn.addEventListener("click", () => {
-                leftPanel.classList.toggle("collapsed");
+                    // Toggle the "collapsed" class on the left panel
+                    leftPanel.classList.toggle("collapsed");
 
-                // Notify the ArcGIS MapView to resize when panel changes
-                if (window.view) { // assuming your MapView is stored in `view`
-                    window.view.padding = {
-                    left: leftPanel.classList.contains("collapsed") ? 40 : 250,
-                    top: 0,
-                    right: 0,
-                    bottom: 0
-                    };
-                    window.view.resize();
-                }
+                    // Notify the ArcGIS MapView to resize when the panel width changes
+                    if (window.view) { // MapView instance is stored globally as `view`
+                        window.view.padding = {
+                            left: leftPanel.classList.contains("collapsed") ? 40 : 250, // adjust left padding based on panel state
+                            top: 0,
+                            right: 0,
+                            bottom: 0
+                        };
+                        window.view.resize(); // refresh the view to account for new padding
+                    }
                 });
 
+                // Function to handle clicking the "Add Record" button
                 function handleAddRecord() {
-                    // Opens your Survey123 form in a new tab
-                    window.open("https://survey123.arcgis.com/share/679dbea6861f447ca59cdfcb53ae88b5", "_blank");
+                    // Opens the Survey123 form in a new browser tab
+                    window.open(
+                        "https://survey123.arcgis.com/share/679dbea6861f447ca59cdfcb53ae88b5",
+                        "_blank"
+                    );
                 }
 
+                // Function to handle GPX file uploads
                 function handleGPXUpload(event) {
-                const file = event.target.files[0];
-                if (!file) return;
+                    // Grab the first file selected by the user
+                    const file = event.target.files[0];
+                    if (!file) return; // exit if no file selected
 
-                const bufferDistance = Number(document.getElementById("bufferInput").value) || 50;
+                    // Get the buffer distance from the input box (default to 50 if empty or invalid)
+                    const bufferDistance = Number(document.getElementById("bufferInput").value) || 50;
 
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const parser = new DOMParser();
-                    const xml = parser.parseFromString(e.target.result, "application/xml");
-                    const trkpts = xml.getElementsByTagName("trkpt");
+                // Reader 
+                const reader = new FileReader(); // Create a new FileReader to read the uploaded GPX file
 
-                    if (!trkpts.length) {
-                    alert("No GPS track points found in the GPX file.");
-                    return;
+                reader.onload = function(e) { // Triggered when the file is fully read
+                    const parser = new DOMParser(); // Create a DOMParser instance, which allows parsing XML or HTML strings into a structured DOM tree in memory
+                    
+                    // Take the text content of the uploaded GPX file (e.target.result) and parse it as XML
+                    // This converts the raw GPX text into a DOM structure that JavaScript can navigate, query, and extract elements from
+                    const xml = parser.parseFromString(e.target.result, "application/xml"); 
+
+                    // Query the XML DOM for all <trkpt> elements, which are GPX track points representing GPS coordinates
+                    // Each <trkpt> typically has "lat" and "lon" attributes storing latitude and longitude
+                    // This returns a live HTMLCollection of all track points in the GPX file
+                    // Then loop over this collection to extract coordinates for mapping or analysis
+                    const trkpts = xml.getElementsByTagName("trkpt"); 
+
+                    if (!trkpts.length) { alert("No GPS track points found."); return; } // Stop if file contains no track points
+
+                    const path = []; // Initialize array to store coordinates
+                    for (let i = 0; i < trkpts.length; i++) { // Loop over each track point
+                        const lat = parseFloat(trkpts[i].getAttribute("lat")); // Get latitude as a number
+                        const lon = parseFloat(trkpts[i].getAttribute("lon")); // Get longitude as a number
+                        path.push([lon, lat]); // Add [longitude, latitude] pair to path array
                     }
 
-                    const path = [];
-                    for (let i = 0; i < trkpts.length; i++) {
-                    const lat = parseFloat(trkpts[i].getAttribute("lat"));
-                    const lon = parseFloat(trkpts[i].getAttribute("lon"));
-                    path.push([lon, lat]);
-                    }
-
-                    const polyline = {
-                    type: "polyline",
-                    paths: [path],
-                    spatialReference: { wkid: 4326 }
+                    const polyline = { // Create a polyline geometry from GPX points
+                        type: "polyline", // Geometry type
+                        paths: [path], // Array of paths (here only one)
+                        spatialReference: { wkid: 4326 } // WGS84 latitude/longitude
                     };
 
-                    // ✅ Project polyline to Web Mercator before buffering
-                    require([
-                    "esri/geometry/projection",
-                    "esri/geometry/support/webMercatorUtils"
-                    ], (projection, webMercatorUtils) => {
+                    // Project polyline to match the FeatureLayer's spatial reference for accurate overlay
+                    require(["esri/geometry/projection","esri/geometry/support/webMercatorUtils"], (projection, webMercatorUtils) => {
+                        projection.load().then(() => { // Load projection engine
 
-                    projection.load().then(() => {
+                            const gpxSR = { wkid: 4326 }; // GPX native spatial reference
+                            const layerSR = layer.spatialReference; // Get spatial reference of the FeatureLayer
 
-                        // Get SRs
-                        const gpxSR = { wkid: 4326 };                  // GPX native
-                        const layerSR = layer.spatialReference;        // e.g. 4326 or 3857
+                            let polylineProjected = projection.project(polyline, layerSR); // Project GPX polyline to layer spatial reference
 
-                        // Project GPX polyline into the layer's SR (ensures perfect alignment)
-                        let polylineProjected = projection.project(polyline, layerSR);
+                            console.log("Original GPX polyline:", polyline); // Log original polyline
+                            console.log("Projected polyline SR:", polylineProjected.spatialReference); // Log projected spatial reference
+                            console.log("FeatureLayer WKID:", layer.spatialReference.wkid); // Log layer WKID
 
-                        console.log("Original GPX polyline:", polyline);
-                        // console.log("Projected polyline:", polylineProjected);
-                        console.log("Projected polyline SR:", polylineProjected.spatialReference);
-                        // console.log("FeatureLayer spatial reference:", layer.spatialReference);
-                        console.log("FeatureLayer WKID:", layer.spatialReference.wkid);
+                            view.goTo({ target: polylineProjected, zoom: 10 }).catch(err => console.warn(err)); // Center map on polyline
 
-                        // Center map on uploaded route
-                        view.goTo({ target: polylineProjected, zoom: 10 }).catch(err => console.warn(err));
-
-                        // Add GPX track to the map for visualization
-                        const gpxLineGraphic = new Graphic({
-                        geometry: polylineProjected,
-                        symbol: {
-                            type: "simple-line",
-                            // color: [0, 120, 255, 0.8], // bright blue line
-                            // color: [128, 0, 128, 0.8],
-                            color: [255, 0, 255, 0.8],
-                            width: 2
-                        }
-                        });
-
-                        // Optional: clear old GPX tracks before adding new
-                        view.graphics.removeAll();
-                        view.graphics.add(gpxLineGraphic);
-
-                        // If projection service unavailable, fall back to WebMercatorUtils
-                        if (!polylineProjected) {
-                        polylineProjected = webMercatorUtils.geographicToWebMercator(polyline);
-                        console.log("Fallback projected polyline (Web Mercator):", polylineProjected);
-                        }
-
-                        // Buffer in meters only if layerSR is linear
-                        let bufferGeom;
-                        if (layerSR.isGeographic) {
-                        // project to a linear SR for buffering
-                        const tempLinear = { wkid: 3857 };
-                        const tempProj = projection.project(polyline, tempLinear);
-                        const buffered = geometryEngine.buffer(tempProj, bufferDistance, "meters");
-                        // reproject back to layer's SR
-                        bufferGeom = projection.project(buffered, layerSR);
-                        } else {
-                        bufferGeom = geometryEngine.buffer(polylineProjected, bufferDistance, "meters");
-                        }
-
-                        // <<< ADD THIS BLOCK TO SHOW THE BUFFER ON THE MAP >>>
-                        require(["esri/Graphic"], (Graphic) => {
-                        const bufferGraphic = new Graphic({
-                            geometry: bufferGeom,
-                            symbol: {
-                            type: "simple-fill",
-                            color: [200, 160, 255, 0.1], // light blue, semi-transparent
-                            outline: {
-                                // color: [0, 0, 255, 0.8],
-                                color: [128, 0, 128, 0.2], // bright blue line
-                                width: 0.5
-                            }
-                            }
-                        });
-                        view.graphics.add(bufferGraphic);
-                        });
-
-                        // Convert buffer back to WGS84 for querying (layer likely in 4326)
-                        const bufferWGS84 = projection.project(bufferGeom, { wkid: 4326 });
-
-                        const query = layer.createQuery();
-                        query.geometry = bufferWGS84;
-                        query.spatialRelationship = "intersects";
-                        query.returnGeometry = true;
-                        query.outFields = ["access_status", "impasse_reasons"];
-
-                        layer.queryFeatures(query).then((results) => {
-                        if (results.features.length > 0) {
-                            alert(`⚠️ WARNING: ${results.features.length} closures found within ${bufferDistance}m of your route.`);
-                            results.features.forEach(f => {
-                            f.symbol = {
-                                type: "simple-marker",
-                                color: "red",
-                                size: "10px"
-                            };
+                            const gpxLineGraphic = new Graphic({ // Create a graphic for the uploaded GPX track
+                                geometry: polylineProjected, // Use projected polyline
+                                symbol: { type: "simple-line", color: [255, 0, 255, 0.8], width: 2 } // Purple line style
                             });
-                            view.graphics.addMany(results.features);
-                        } else {
-                            alert("✅ No closures found near your uploaded route.");
-                        }
-                        }).catch(err => console.error("Query failed", err));
-                    });
-                    });
-                };
-                reader.readAsText(file);
-                }
 
-            });
-        };
+                            view.graphics.removeAll(); // Clear any previous graphics on the map
+                            view.graphics.add(gpxLineGraphic); // Add GPX track to map
+
+                            if (!polylineProjected) polylineProjected = webMercatorUtils.geographicToWebMercator(polyline); // Fallback if projection fails
+
+                            let bufferGeom; // Initialize variable for buffer geometry
+                            if (layerSR.isGeographic) { // If layer spatial referrence is geographic (non-linear)
+                                const tempLinear = { wkid: 3857 }; // Use Web Mercator for linear buffer
+                                const tempProj = projection.project(polyline, tempLinear); // Project polyline to linear spatial reference
+                                const buffered = geometryEngine.buffer(tempProj, bufferDistance, "meters"); // Buffer in meters
+                                bufferGeom = projection.project(buffered, layerSR); // Reproject buffer back to layer spatialreferenec
+                            } else {
+                                bufferGeom = geometryEngine.buffer(polylineProjected, bufferDistance, "meters"); // Buffer directly if linear
+                            }
+
+                            // Add buffer to map as semi-transparent polygon
+                            require(["esri/Graphic"], (Graphic) => {
+                                const bufferGraphic = new Graphic({
+                                    geometry: bufferGeom, // Geometry of the buffer
+                                    symbol: { 
+                                        type: "simple-fill", // Fill polygon
+                                        color: [200,160,255,0.1], // Light purple fill with transparency
+                                        outline: { color: [128,0,128,0.2], width: 0.5 } // Thin purple outline
+                                    } 
+                                });
+                                view.graphics.add(bufferGraphic); // Add buffer graphic to map
+                            });
+
+                            const bufferWGS84 = projection.project(bufferGeom, { wkid: 4326 }); // Convert buffer to WGS84 for querying
+
+                            const query = layer.createQuery(); // Create query for FeatureLayer
+                            query.geometry = bufferWGS84; // Use buffer as query geometry
+                            query.spatialRelationship = "intersects"; // Find features that intersect buffer
+                            query.returnGeometry = true; // Include geometry in results
+                            query.outFields = ["access_status","impasse_reasons"]; // Specify fields to return
+
+                            layer.queryFeatures(query).then((results) => { // Execute query
+                                if (results.features.length > 0) { // If closures found
+                                    alert(`⚠️ ${results.features.length} closures found within ${bufferDistance}m.`); // Display alert in browser
+                                    results.features.forEach(f => f.symbol = { type:"simple-marker", color:"red", size:"10px" }); // Style markers
+                                    view.graphics.addMany(results.features); // Add closure markers to map
+                                } else { 
+                                    alert("✅ No closures found near your route."); // No closures found
+                                }
+                            }).catch(err => console.error("Query failed", err)); // Handle query errors
+
+                        }); // End projection.load
+                    }); // End require projection
+                }; // End reader.onload → closes the function that runs after the GPX file is read
+
+                reader.readAsText(file); // Start reading GPX file as text
+                } // End handleGPXUpload function → closes the function that handles the GPX file input event
+
+            }); // End require callback → closes the function passed to require([...], function(...) {...})
+        }; // End window.onload → closes the function that runs after the DOM is fully loaded
     </script>
   </body>
 </html>
