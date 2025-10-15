@@ -164,6 +164,20 @@
         #panelContent::-webkit-scrollbar-track {
             background: transparent; /* Makes the track fully transparent */
         }
+
+        /* Basemap Gallery container inside the Expand widget */
+        #viewDiv .esri-basemap-gallery {
+            width: 200px;
+            height: 200px;
+        }
+
+        /* Responsive for small screens */
+        @media (max-width: 600px) {
+            #viewDiv .esri-basemap-gallery {
+                width: 150px;
+                height: 150px;
+            }
+        }
     </style>
 
     <!-- References the main.css style sheet, which contains styles specific to Esri widgets and components. -->
@@ -209,8 +223,10 @@
                 "esri/widgets/Search", 
                 "esri/layers/FeatureLayer",
                 "esri/geometry/geometryEngine",
-                "esri/Graphic"
-            ], (esriConfig, Map, MapView, Locate, Search, FeatureLayer, geometryEngine, Graphic) => { 
+                "esri/Graphic",
+                "esri/widgets/BasemapGallery", 
+                "esri/widgets/Expand"
+            ], (esriConfig, Map, MapView, Locate, Search, FeatureLayer, geometryEngine, Graphic, BasemapGallery, Expand) => { 
                 
                 // Log into the API with a private key
                 esriConfig.apiKey = "AAPTxy8BH1VEsoebNVZXo8HurC-WNby9xVB5CaUbYmSkdtsZmMyGnfH1JuHkPFwFFSBd3Z-v-N7m_s6f1dmRgKVLamcFHqSo0cttTR09tKsFzmbXZUhJIfKzl2R6HLQtKWGyGlzHobrqUHrwEOtLR9miyCr3AH4LGIs4bD8J_IfjNZJFYZiID06JxdIjFa_CX5wLcu2d2_5Pr2huNg7-z1mKuSnOsU5nBktIt9t_XxG-4s-ytgy_1uafScxdrTypBn4BAT1_UUjVT5i4";
@@ -278,6 +294,24 @@
 
                 // Move the Zoom widget to the bottom-right
                 view.ui.move("zoom", "bottom-right");
+
+                const basemapGallery = new BasemapGallery({
+                    view: view,
+                    container: document.createElement("div") // Create a new div element for the widget
+                });
+
+                // Wrap in Expand
+                const basemapGalleryExpand = new Expand({
+                    view: view,
+                    content: basemapGallery,
+                    expandIconClass: "esri-icon-basemap",
+                    expanded: false
+                });
+
+                view.ui.add(basemapGalleryExpand, {
+                    position: "bottom-right", // Position above the Locate Me widget
+                    index: 0 // Adjust the index to position it next to the Zoom widget
+                });
 
                 // Creating a new FeatureLayer from an existing ArcGIS Feature Service.
                 // This layer will represent survey data about road closures, making it visible and interactive on the map.
