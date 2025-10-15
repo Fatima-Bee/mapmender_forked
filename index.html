@@ -3,6 +3,9 @@
 - Make the closure symbol a circle with slash
 - Make the hazard symbol a caution w/ exclamation
 - Improved reopening logic.  Concern that once marked as closed, users may route away indefinitely.  Need an automated way detect reopening.
+- Add a Map Gallery
+- Rerouting
+- Road Closure API 
 -->
 
 <!DOCTYPE html>
@@ -12,61 +15,60 @@
     <!-- meta for the browser to allow for mobiel first design -->
     <meta charset="utf-8"/> <!--This ensures that the web page can display characters from various languages and character sets.-->
     
-    <!--Sets the viewport properties for the web page. The viewport determines how the web page is displayed on different devices and screen sizes. 
-    The "initial-scale=1" property sets the initial zoom level of the page to 100%, while the "maximum-scale=1" and "user-scalable=no" properties 
-    prevent users from zooming in or out of the page using pinch or zoom gestures on their devices.-->
+    <!-- Sets the viewport properties for the web page. The viewport determines how the web page is displayed on different devices and screen sizes. 
+    The "initial-scale=1" property sets the initial zoom level of the page to 100%. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>Mapmender - See the World as it Is — Not as it Was.</title>
+    <!-- Title of the webpage, displayed in the browser tab. -->
+    <title>Mapmender - See the World as it Is — Not as it Was.</title> 
 
-    <!-- To make the map fill the browser window -->
     <style>
-        /* Full height map and reset margins */
+        /* These rules apply to the <html> element, the <body> element, and the #viewDiv (which is the container for the map). */
         html,
         body,
         #viewDiv {
-            padding: 0;
-            margin: 0;
-            height: 100%;
-            width: 100%;
-            font-family: Arial, sans-serif;
+            padding: 0;                      /* Removes all default inner spacing around content. */
+            margin: 0;                       /* Removes default outer spacing applied by browsers. */
+            height: 100%;                    /* Ensures each element takes the full available viewport height. */
+            width: 100%;                     /* Ensures each element takes the full available viewport width. */
+            font-family: Arial, sans-serif;  /* Sets a consistent font for text elements (fallback to any sans-serif). */
         }
 
-        /* Left panel styling */
+        /* === Left panel styling === */
         #leftPanel {
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: 100%;
-            width: 250px;           /* expanded width */
-            background: #892be2d0;  /* purple with slight transparency */
-            color: white;            /* default text color */
-            box-shadow: 2px 0 5px rgba(0,0,0,0.3);
-            z-index: 100;
-            overflow: hidden;
-            transition: width 0.3s;
+            position: absolute;          /* Positions the panel relative to the map container (not affected by normal layout flow). */
+            top: 0;                      /* Aligns the top edge of the panel with the top of the window. */
+            left: 0;                     /* Anchors the panel to the left side of the screen. */
+            height: 100%;                /* Makes the panel stretch the full height of the viewport. */
+            width: 250px;                /* Sets the panel’s width when expanded (default state). */
+            background: #892be2a3;     /* Applies a background color and transparency. */
+            color: white;              /* Sets all text inside the panel to white for contrast. */
+            box-shadow: 2px 0 5px rgba(0,0,0,0.3); /* Adds a subtle shadow along the right edge for depth. */
+            z-index: 100;                /* Ensures the panel sits above the map and other elements. */
+            overflow: hidden;            /* Hides any overflowing content (useful when collapsing). */
+            transition: width 0.3s;      /* Smoothly animates width changes (e.g., when collapsing/expanding). */
         }
 
         #leftPanel.collapsed {
             width: 40px;             /* collapsed width, just shows toggle button */
         }
 
-        /* Toggle button */
+        /* === Collapse/Expand Toggle button styling === */
         #togglePanelBtn {
-            display: block;
-            margin: 10px;
-            font-size: 20px;
-            cursor: pointer;
-            background: none;
-            border: none;
-            color: white;
+            display: block;          /* Makes the button take up the full available width (behaves like a block element). */
+            margin: 10px;            /* Adds space around the button for padding from the panel edges. */
+            font-size: 20px;         /* Increases the icon or text size for visibility. */
+            cursor: pointer;         /* Changes the cursor to a pointer (hand icon) when hovered, indicating it's clickable. */
+            background: none;        /* Removes any default button background styling. */
+            border: none;            /* Removes the default button border for a clean, flat look. */
+            color: white;            /* Sets the icon or text color to white to match the panel theme. */
         }
 
-        /* Panel content */
+        /* === Panel content styling ensures that everything inside the left panel (buttons, inputs, text, etc.) is neatly spaced and scrollable when necessary === */
         #panelContent {
-            padding: 10px;
-            max-height: calc(100% - 50px);
-            overflow-y: auto;        /* scroll only if content exceeds panel height */
+            padding: 10px;                        /* Adds inner spacing so text and buttons aren’t flush against the edges. */
+            max-height: calc(100% - 50px);        /* Ensures the content fits within the panel, leaving space for the toggle button above the panel content. */
+            overflow-y: auto;                     /* Adds a vertical scrollbar *only* if content exceeds available height. */
         }
 
         /* Hide content when collapsed */
@@ -74,76 +76,62 @@
             display: none;
         }
 
-        /* Header in the panel */
+        /* For any Header in the panel */
         #panelContent h4 {
-            margin: 0 0 10px 0;
-            font-size: 14px;
-            font-weight: normal;     /* lighter text */
-            display: flex;
-            align-items: center;
+            margin: 0 0 10px 0;          /* Top: 0, Right: 0, Bottom: 10px, Left: 0 spacing below the header */
+            font-size: 14px;             /* Sets a smaller, more subtle font size for panel headers */
+            font-weight: normal;         /* Makes the text lighter instead of bold */
+            display: flex;               /* Allows horizontal alignment of content, useful if header has icons + text */
+            align-items: center;         /* Vertically centers any inline content (e.g., icons) within the header */
         }
 
-        /* Add green checkmark next to header text */
-        #panelContent h4 span {
-            margin-right: 6px;
-        }
-
-        /* GPX uploader container inside the panel */
-        #uploadContainer {
-            background: #9b30ff;     /* lighter purple */
-            padding: 10px;
-            border-radius: 8px;
-            box-shadow: 0 0 5px rgba(0,0,0,0.3);
-            margin-bottom: 12px;
-        }
-
-        /* Input fields inside panel */
+        /* Input fields inside the expandable toolbar (e.g., GPX upload and buffer size) */
         #panelContent input[type="file"],
         #panelContent input[type="number"] {
-            margin-top: 6px;
-            width: 100%;
-            padding: 6px 8px;
-            border-radius: 4px;
-            border: none;
-            outline: none;
-            font-family: inherit;
-            font-size: inherit;
-            color: black;             /* ensures buffer value is visible */
-            background-color: white;   /* matches button style */
-            box-sizing: border-box;
+            margin-top: 6px;          /* Adds spacing above each input field for visual separation */
+            width: 100%;              /* Makes input fields span the full width of the panel */
+            padding: 6px 8px;         /* Adds inner spacing so text isn’t flush against edges */
+            border-radius: 4px;       /* Softly rounds the corners for a cleaner look */
+            border: none;             /* Removes the browser’s default border */
+            outline: none;            /* Prevents the blue highlight when the field is focused */
+            font-family: inherit;     /* Ensures the same font as the surrounding text */
+            font-size: inherit;       /* Keeps consistent text sizing with the panel */
+            color: black;             /* Ensures the entered text (e.g., buffer value) is visible */
+            background-color: white;  /* Matches the button style for a unified look */
+            box-sizing: border-box;   /* Includes padding in the total width to prevent overflow */
         }
 
         /* Label for buffer input */
         #panelContent label {
-            display: block;
-            margin-top: 8px;
-            font-size: 13px;
+            display: block;          /* Makes each label take up the full width (so it sits above its input) */
+            margin-top: 8px;         /* Adds spacing above each label for separation from previous elements */
+            font-size: 14px;         /* Sets a readable, consistent text size for all labels */
         }
 
-        /* “Report a Closure” button inside panel */
+        /* “Report a Closure” button inside the left panel */
         #addRecordBtn {
-            display: block;
-            width: 100%;
-            text-align: center;
-            background-color: white;   /* white fill */
-            color: #892be2;            /* purple text */
-            padding: 10px 0;
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            text-decoration: none;
-            box-shadow: 0 0 5px rgba(0,0,0,0.3);
-            margin-bottom: 12px;       /* space before next section */
+            display: block;             /* Ensures the button is treated as a block element (fills the container width) */
+            width: 100%;                /* Makes the button stretch across the entire panel width */
+            text-align: center;         /* Centers the button text horizontally */
+            background-color: white;  /* Gives the button a white fill to stand out from the purple panel */
+            color: #892be2;           /* Uses the project’s purple color for text to match overall theme */
+            padding: 10px 0;            /* Adds vertical spacing inside the button for comfortable click area */
+            border: none;               /* Removes default browser button borders */
+            border-radius: 6px;         /* Softly rounds the button corners for a clean, modern look */
+            font-size: 14px;            /* Sets consistent text size */
+            font-weight: normal;        /* Makes the button label stand out */
+            cursor: pointer;            /* Changes cursor to pointer to indicate it's clickable */
+            text-decoration: none;      /* Prevents underline in case the button is rendered as a link */
+            box-shadow: 0 0 5px rgba(0,0,0,0.3); /* Adds subtle shadow for depth and contrast */
+            margin-bottom: 12px;        /* Adds spacing below to separate it from the next section */
         }
 
         /* Hover effect for button */
         #addRecordBtn:hover {
-            background-color: #f0f0f0;  /* subtle light gray hover */
+            background-color: #f4ecec;  /* subtle light gray hover */
         }
 
-        /* Optional horizontal separator between button and GPX section */
+        /* Horizontal separator between button and GPX section */
         #panelContent hr {
             border: 0;
             border-top: 1px solid rgba(255,255,255,0.3);
@@ -156,81 +144,55 @@
         #panelContent label,
         #panelContent input,
         #panelContent button {
-            font-family: Arial, sans-serif;
+            font-family: Calibri, Candara, Segoe, sans-serif;
+            font-size: 17px; 
         }
 
-        /* Optional: scroll bar styling */
+        /* Scroll bar styling for the #panelContent element */
+        /* Target the entire scrollbar inside #panelContent (WebKit browsers only) */
         #panelContent::-webkit-scrollbar {
-            width: 6px;
+            width: 6px; /* Sets the width of the vertical scrollbar to 6px */
         }
 
+        /* Target the draggable “thumb” part of the scrollbar */
         #panelContent::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.3);
-            border-radius: 3px;
+            background: rgba(255,255,255,0.3); /* Semi-transparent white color for the thumb */
+            border-radius: 3px; /* Rounds the corners of the scrollbar thumb */
         }
 
+        /* Target the track (the background area behind the thumb) */
         #panelContent::-webkit-scrollbar-track {
-            background: transparent;
+            background: transparent; /* Makes the track fully transparent */
         }
     </style>
-
 
     <!-- References the main.css style sheet, which contains styles specific to Esri widgets and components. -->
     <!-- 'rel' means "relationship" between the current HTML document and the linked resource -->
     <!-- 'href' means hyperlink reference -->
     <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css"/>
 
-    <!-- Loading the ArcGIS Maps SDK for JavaScript from a CDN. When new versions of the API are released, update the version number to match the newly released version. -->
+    <!-- Loading the ArcGIS Maps SDK for JavaScript from a CDN. -->
     <script src="https://js.arcgis.com/4.29/"></script>
     
   </head>
 
   <body>
-   <!-- hello world text to check if everything worked -->
-   <!-- <h1>Hello World! I am ready to collect data.</h1> -->
 
-    <!-- Collapsible Sidebar -->
-    <!-- <div id="sidebar">
-    <button id="toggleSidebar">☰ Tools</button>
-    <div id="sidebarContent">
-
-        <h3>Tools</h3> -->
-
-        <!-- <div class="tool-section"> -->
-        <!-- <h4>➕ Add Record</h4> -->
-            <!-- <a href="https://survey123.arcgis.com/share/679dbea6861f447ca59cdfcb53ae88b5"
-            target="_blank"
-            class="addRecordBtn"
-            id="addRecordBtn">📍Report a Closure or Hazard</a>
-        </div>
-
-        <div class="tool-section">
-        <h4>✅ Check a Route for Closures (.GPX)</h4>
-        <input type="file" id="gpxInput" accept=".gpx" />
-        <br><br>
-        <label>Buffer (meters): 
-            <input type="number" id="bufferInput" value="50" min="5" step="5" />
-        </label>
-        </div>
-
-    </div>
-    </div> -->
-
-    <div id="leftPanel" class="collapsed">
-        <button id="togglePanelBtn">☰</button>
-        <div id="panelContent">
-            <button id="addRecordBtn">Report a Closure</button>
-            <!-- Divider -->
-            <hr style="border: 1px solid rgba(255,255,255,0.3); margin: 15px 0;" />
-            <h4>Check a Route for Closures (.GPX)</h4>
-            <input type="file" id="gpxInput" accept=".gpx" />
-            <br><br>
-            <label>Buffer (meters): <input type="number" id="bufferInput" value="50" /></label>
-        </div>
-        </div>
+    <!-- DOM element to hold the collapsible left toolbar.  -->
+    <!-- <div> (short for division) is a generic HTML block element. It doesn’t show anything by itself — it’s just a rectangle you can style. -->
+    <div id="leftPanel" class="collapsed"> <!-- Left sidebar panel, starts collapsed -->
+        <button id="togglePanelBtn">☰</button> <!-- Button to expand/collapse the panel (hamburger icon) -->
+        <div id="panelContent"> <!-- Container for the panel’s content -->
+            <button id="addRecordBtn">Report a Closure</button> <!-- Button to trigger reporting a closure -->
+            <hr style="border: 1px solid rgba(255,255,255,0.3); margin: 15px 0;" /> <!-- Divider line between sections -->
+            <h4>Check a Route for Closures (.GPX)</h4> <!-- Section title for GPX route checking -->
+            <input type="file" id="gpxInput" accept=".gpx" /> <!-- File input to upload GPX file -->
+            <br><br> <!-- Spacing between inputs -->
+            <label>Buffer (meters): <input type="number" id="bufferInput" value="50" /> <!-- Number input for buffer distance in meters --></label>
+        </div> <!-- End of panelContent -->
+    </div> <!-- End of leftPanel -->
 
     <!-- DOM element to hold the main map.  -->
-    <!-- <div> (short for division) is a generic HTML block element. It doesn’t show anything by itself — it’s just a rectangle you can style. -->
     <div id="viewDiv"></div>
 
     <script> 
@@ -256,7 +218,6 @@
                 // This module creates a map object that defines the basemap and operational layers.
                 const map = new Map({
                     basemap: "arcgis-navigation"
-                    // basemap: "satellite"
                     // Try any of these: "arcgis-imagery", "arcgis-imagery-standard", "arcgis-imagery-labels", "arcgis-light-gray", "arcgis-dark-gray", "arcgis-navigation", "arcgis-navigation-night", "arcgis-streets", "arcgis-streets-night", "arcgis-streets-relief", "arcgis-topographic", "arcgis-oceans", "osm-standard", "osm-standard-relief", "osm-streets", "osm-streets-relief", "osm-light-gray", "osm-dark-gray", "arcgis-terrain", "arcgis-community", "arcgis-charted-territory", "arcgis-colored-pencil", "arcgis-nova", "arcgis-modern-antique", "arcgis-midcentury", "arcgis-newspaper", "arcgis-hillshade-light", "arcgis-hillshade-dark", "arcgis-human-geography", "arcgis-human-geography-dark"
                 })
 
@@ -267,40 +228,40 @@
                     container: "viewDiv",               // The HTML element id where the map will appear.  Tells the view where (which DOM node) in the HTML to put the map.  Looks for a <div> with id="viewDiv"
                     map: map,                           // The map object (from earlier) to display inside the viewDiv.
                     center: [-89.4012, 43.0731],        // Madison, WI (fallback)
-                    zoom: 13                            // Zoom level of the map.  0 > whole world, 23 street level.
+                    zoom: 13                            // Initial zoom level of the map.  0 > whole world, 23 street level.
                 })
 
                 // Try to center the map on the user's location
-                if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(               // Built-in browser API for location.
-                    (position) => {
-                        // Success — center the view on user's location
-                        const userLongitude = position.coords.longitude;
-                        const userLatitude = position.coords.latitude;
+                if (navigator.geolocation) { // Check if the browser supports geolocation
+                    navigator.geolocation.getCurrentPosition( // Built-in browser API to get user's location
+                        (position) => { // Success callback when location is obtained
+                            // Extract longitude and latitude from the position object
+                            const userLongitude = position.coords.longitude;
+                            const userLatitude = position.coords.latitude;
 
-                        view.center = [userLongitude, userLatitude];        // Recenter the map on the user's longitude and latitude, if possible.
-                        view.zoom = 13;
+                            view.center = [userLongitude, userLatitude]; // Recenter the map on the user's coordinates
+                            view.zoom = 13; // Zoom level to focus on user's location
 
-                        console.log(`Centered on user location: ${userLongitude}, ${userLatitude}`);
-                    },
-                    (error) => {
-                        console.warn("Geolocation failed or denied. Using fallback (Madison, WI).", error);
-                    },
-                    { enableHighAccuracy: true, timeout: 10000 }        // Uses GPS (if available) instead of IP-based location.
-                );
+                            console.log(`Centered on user location: ${userLongitude}, ${userLatitude}`); // Log coordinates for debugging
+                        },
+                        (error) => { // Error callback if geolocation fails or is denied
+                            console.warn("Geolocation failed or denied. Using fallback (Madison, WI).", error); // Warn and fall back to default location
+                        },
+                        { enableHighAccuracy: true, timeout: 10000 } // Use GPS instead of IP Address if possible and timeout after 10s
+                    );
 
-                } else {
-                    console.warn("Geolocation not supported. Using fallback (Madison, WI).");
-                }
+                    } else { // If the browser does NOT support the Geolocation API
+                        console.warn("Geolocation not supported. Using fallback (Madison, WI)."); // Log a warning and indicate that a default location will be used
+                    }
 
                 // Adding a Locate button (widget)
                 const locateBtn = new Locate({
-                    // view (on the left) >  This is the property name of the Locate widget’s options.
-                    // view (on the right) >  This is the variable created earlier in the code.
-                    view: view                          // Tell the Locate widget which MapView it should control.
-                })
+                    // view (on the left) > the property name expected by the Locate widget
+                    // view (on the right) > the variable referencing your MapView instance created earlier
+                    view: view // Assigns this Locate widget to control the specific MapView
+                });
 
-                view.ui.add(locateBtn, {                // Add the locate widget to the view's built-in UI
+                view.ui.add(locateBtn, {                // Add the Locate widget to the view's built-in UI
                     position: "bottom-right"            // Position the widget in the bottom-right corner of the map
                 });
 
@@ -308,72 +269,93 @@
                 const searchWidget = new Search({
                     // view: (on the left) >  This is the property name of the Locate widget’s options.
                     // view (on the right) >  This is the variable created earlier in the code.
-                    view: view                          // Tell the Search widget which MapView it shoudl control. 
+                    view: view                          // Tell the Search widget which MapView it should control. 
                 });
 
-                view.ui.add(searchWidget, {
-                    position: "top-right"
+                view.ui.add(searchWidget, {             // Add the Search widget to the view's built-in UI
+                    position: "top-right"               // Position the widget in the bottom-right corner of the map
                 });
 
-                // Move the default Zoom widget to the bottom-right
+                // Move the Zoom widget to the bottom-right
                 view.ui.move("zoom", "bottom-right");
 
-                // Creating the Survey FeatureLayer from the feature service.
+                // Creating a new FeatureLayer from an existing ArcGIS Feature Service.
+                // This layer will represent survey data about road closures, making it visible and interactive on the map.
                 const layer = new FeatureLayer({
-                    // url: "https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Closure_Layer/FeatureServer/0"
+                    // URL of the Feature Service and specific layer (0 = first layer in the service)
                     url: "https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Closure_Layer_Public/FeatureServer/0",
-                    outFields: ["*"], // make all fields available to the popup
+                    
+                    // outFields specifies which fields are available for popups, queries, and rendering.
+                    // Using ["*"] makes all fields in the service available.
+                    outFields: ["*"],
+
+                    // Define how popups will display when a user clicks a feature.
                     popupTemplate: {
-                        title: "Road Closure",
+                        title: "Road Closure", // Popup header
                         content: `
-                        <b>Status:</b> {access_status}<br>
-                        <b>Impassability:</b> {impasse_reasons}<br>
-                        <b>Hazards:</b> {hazards}<br>
-                        <b>Latitude:</b> {esrignss_latitude}<br>
-                        <b>Longitude:</b> {esrignss_longitude}<br>
-                        <b>Reported by:</b> {Creator}<br>
-                        <b>Last Updated:</b> {EditDate}<br>
-                        <b>Notes:</b> {notes}
+                            <b>Status:</b> {access_status}<br>
+                            <b>Impassability:</b> {impasse_reasons}<br>
+                            <b>Hazards:</b> {hazards}<br>
+                            <b>Latitude:</b> {esrignss_latitude}<br>
+                            <b>Longitude:</b> {esrignss_longitude}<br>
+                            <b>Reported by:</b> {Creator}<br>
+                            <b>Last Updated:</b> {EditDate}<br>
+                            <b>Notes:</b> {notes}
                         `
+                        // Note: The {} syntax automatically pulls the attribute values from the feature.
                     }
                 });
 
-                // Adding the Survey FeatureLayer to the map.
+                // Add the FeatureLayer to the map instance so it will render on the map.
                 map.add(layer);
 
                 // GPX handling section
+                // Add an event listener to the GPX file input element.  When the user selects a GPX file, the handleGPXUpload function is called.
                 document.getElementById("gpxInput").addEventListener("change", handleGPXUpload);
+
+                // Add an event listener to the "Add Record" button.
+                // When clicked, the handleAddRecord function is triggered.
                 document.getElementById("addRecordBtn").addEventListener("click", handleAddRecord);
 
-                const leftPanel = document.getElementById("leftPanel");
-                const toggleBtn = document.getElementById("togglePanelBtn");
-                const viewDiv = document.getElementById("viewDiv");
+                // Grab references to key HTML elements for panel management and map display
+                const leftPanel = document.getElementById("leftPanel");      // The collapsible left panel
+                const toggleBtn = document.getElementById("togglePanelBtn"); // Button to collapse/expand the panel
+                const viewDiv = document.getElementById("viewDiv");          // Div containing the ArcGIS MapView
 
+                // Add click event to toggle button to collapse/expand the left panel
                 toggleBtn.addEventListener("click", () => {
-                leftPanel.classList.toggle("collapsed");
+                    // Toggle the "collapsed" class on the left panel
+                    leftPanel.classList.toggle("collapsed");
 
-                // Notify the ArcGIS MapView to resize when panel changes
-                if (window.view) { // assuming your MapView is stored in `view`
-                    window.view.padding = {
-                    left: leftPanel.classList.contains("collapsed") ? 40 : 250,
-                    top: 0,
-                    right: 0,
-                    bottom: 0
-                    };
-                    window.view.resize();
-                }
+                    // Notify the ArcGIS MapView to resize when the panel width changes
+                    if (window.view) { // The MapView instance is stored globally as `view`
+                        window.view.padding = {
+                            left: leftPanel.classList.contains("collapsed") ? 40 : 250, // Adjust left padding based on panel state
+                            top: 0,
+                            right: 0,
+                            bottom: 0
+                        };
+                        window.view.resize(); // Refresh the view to account for new padding
+                    }
                 });
 
+                // Function to handle clicking the "Add Record" button
                 function handleAddRecord() {
-                    // Opens your Survey123 form in a new tab
-                    window.open("https://survey123.arcgis.com/share/679dbea6861f447ca59cdfcb53ae88b5", "_blank");
+                    // Opens the Survey123 form in a new browser tab
+                    window.open(
+                        "https://survey123.arcgis.com/share/679dbea6861f447ca59cdfcb53ae88b5",
+                        "_blank"
+                    );
                 }
 
+                // Function to handle GPX file uploads
                 function handleGPXUpload(event) {
-                const file = event.target.files[0];
-                if (!file) return;
-
-                const bufferDistance = Number(document.getElementById("bufferInput").value) || 50;
+                    const file = event.target.files[0]; // Grab the first file selected by the user
+                    if (!file) return; // exit if no file selected
+                    
+                    // Get the buffer distance from the input box (default to 50 if empty or invalid)
+                    const bufferDistance = Number(document.getElementById("bufferInput").value) || 50; 
+                }
 
                 const reader = new FileReader();
                 reader.onload = function(e) {
