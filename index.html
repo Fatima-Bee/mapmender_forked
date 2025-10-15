@@ -310,52 +310,38 @@
                 map.add(layer);
 
                 // GPX handling section
-                // Add an event listener to the GPX file input element.  When the user selects a GPX file, the handleGPXUpload function is called.
                 document.getElementById("gpxInput").addEventListener("change", handleGPXUpload);
-
-                // Add an event listener to the "Add Record" button.
-                // When clicked, the handleAddRecord function is triggered.
                 document.getElementById("addRecordBtn").addEventListener("click", handleAddRecord);
 
-                // Grab references to key HTML elements for panel management and map display
-                const leftPanel = document.getElementById("leftPanel");      // The collapsible left panel
-                const toggleBtn = document.getElementById("togglePanelBtn"); // Button to collapse/expand the panel
-                const viewDiv = document.getElementById("viewDiv");          // Div containing the ArcGIS MapView
+                const leftPanel = document.getElementById("leftPanel");
+                const toggleBtn = document.getElementById("togglePanelBtn");
+                const viewDiv = document.getElementById("viewDiv");
 
-                // Add click event to toggle button to collapse/expand the left panel
                 toggleBtn.addEventListener("click", () => {
-                    // Toggle the "collapsed" class on the left panel
-                    leftPanel.classList.toggle("collapsed");
+                leftPanel.classList.toggle("collapsed");
 
-                    // Notify the ArcGIS MapView to resize when the panel width changes
-                    if (window.view) { // The MapView instance is stored globally as `view`
-                        window.view.padding = {
-                            left: leftPanel.classList.contains("collapsed") ? 40 : 250, // Adjust left padding based on panel state
-                            top: 0,
-                            right: 0,
-                            bottom: 0
-                        };
-                        window.view.resize(); // Refresh the view to account for new padding
-                    }
+                // Notify the ArcGIS MapView to resize when panel changes
+                if (window.view) { // assuming your MapView is stored in `view`
+                    window.view.padding = {
+                    left: leftPanel.classList.contains("collapsed") ? 40 : 250,
+                    top: 0,
+                    right: 0,
+                    bottom: 0
+                    };
+                    window.view.resize();
+                }
                 });
 
-                // Function to handle clicking the "Add Record" button
                 function handleAddRecord() {
-                    // Opens the Survey123 form in a new browser tab
-                    window.open(
-                        "https://survey123.arcgis.com/share/679dbea6861f447ca59cdfcb53ae88b5",
-                        "_blank"
-                    );
+                    // Opens your Survey123 form in a new tab
+                    window.open("https://survey123.arcgis.com/share/679dbea6861f447ca59cdfcb53ae88b5", "_blank");
                 }
 
-                // Function to handle GPX file uploads
                 function handleGPXUpload(event) {
-                    const file = event.target.files[0]; // Grab the first file selected by the user
-                    if (!file) return; // exit if no file selected
-                    
-                    // Get the buffer distance from the input box (default to 50 if empty or invalid)
-                    const bufferDistance = Number(document.getElementById("bufferInput").value) || 50; 
-                }
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const bufferDistance = Number(document.getElementById("bufferInput").value) || 50;
 
                 const reader = new FileReader();
                 reader.onload = function(e) {
